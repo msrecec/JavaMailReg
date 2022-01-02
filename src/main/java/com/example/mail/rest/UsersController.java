@@ -18,7 +18,9 @@ import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/user")
@@ -37,9 +39,10 @@ public class UsersController {
     }
 
     @PostMapping(value = "/registration", produces = "application/json")
-    public void registerUserAccount(
+    public Map<String, Object> registerUserAccount(
             @RequestBody @Valid UserDto userDto,
-            HttpServletRequest request, Errors errors, Model modelMap) {
+            HttpServletRequest request, Errors errors) {
+        HashMap<String, Object> modelMap = new HashMap<>();
 
         User registered = usersService.register(userDto);
 
@@ -47,33 +50,30 @@ public class UsersController {
         eventPublisher.publishEvent(new OnRegistrationCompleteEvent(registered,
                 request.getLocale(), appUrl));
 
-        modelMap.addAttribute("success", true);
-        modelMap.addAttribute("user", userDto);
+        modelMap.put("success", true);
+        modelMap.put("user", userDto);
+
+        return modelMap;
     }
 
     @GetMapping("/registrationConfirm")
-    public String confirmRegistration (WebRequest request, Model model, @RequestParam("token") String token) {
-        Locale locale = request.getLocale();
+    public Map<String, Object> confirmRegistration (WebRequest request, @RequestParam("token") String token) {
+        HashMap<String, Object> modelMap = new HashMap<>();
 
         VerificationToken verificationToken = usersService.getVerificationToken(token);
-
-        if(verificationToken == null) {
-            String message = messageSource.getMessage("auth.message.invalidToken", null, locale);
-            model.addAttribute("message", message);
-            return "redirect:/badUser.html?lang="+locale.getLanguage();
-        }
 
         User user = verificationToken.getUser();
         Calendar cal = Calendar.getInstance();
         if(((verificationToken.getExpiryDate().getTime())-cal.getTime().getTime()) <= 0) {
-            String messageValue = messageSource.getMessage("auth.message.expired", null, locale);
-            model.addAttribute("message", messageValue);
-            return "redirect:/badUser.html?lang="+locale.getLanguage();
+            String messageValue = "Token has expired";
+            modelMap.put("message", messageValue);
+            return modelMap;
         }
 
         user.setEnabled(true);
         usersService.saveRegisteredUser(user);
-        return "redirect:/login.html?lang="+request.getLocale().getLanguage();
+        modelMap.put("message", "successful registration");
+        return modelMap;
 
     }
 
